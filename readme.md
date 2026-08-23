@@ -5,11 +5,17 @@ lang: en
 keywords: [ ]
 default_: readme
 ---
-## Code to run my Linux servers out of my Windows PC
+## Code to run a few Linux servers out of my Windows PC
 
-Tested and compiled using [WSL2 Ubuntu 2 with Nix installed](https://dev.to/jajera/using-nix-on-windows-the-right-way-14ki).
+Tested and compiled using [WSL2 Ubuntu with Nix installed](https://dev.to/jajera/using-nix-on-windows-the-right-way-14ki).
 
+Outputs a NixOS Linux ISO for use in a VM to keep servers sandboxed.
 
+Contents include:
+
+- Passward manager with Vault Warden
+- Photo manager with Immich
+- Document manager with Seafile
 
 ### Installation
 
@@ -25,13 +31,13 @@ Then, install Nix (the package manager).
 Optionally install direnv (to automatically run `nix develop` when your terminal enters into the project directory).
 
 - [Install direnv](https://direnv.net/docs/installation.html)
-- [Install nix-direnv](https://github.com/nix-community/nix-direnv#installation) for better caching (optional)
 - Open a terminal in this project's root directory
 - Run command `direnv allow`
 
 ### Usage
 
 Be sure to [read the license](./license.md).
+
 #### Scripts
 
 If you have not enabled direnv, run `nix develop` to start the development shell.
