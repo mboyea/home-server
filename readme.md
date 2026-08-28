@@ -51,5 +51,6 @@ Scripts can be run from within any of the project directories.
 | Script | Description |
 |:--- |:--- |
 | `help` | Print usage information for this software |
+| `dev` | Run the servers in a local container |
 
 Scripts are declared in [flake.nix](./flake.nix) and defined in [scripts/](./scripts).

@@ -3,6 +3,24 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+### UTILS ###
+
+CURRENT_DIR="$PWD"
+SCRIPT_DIR="$(
+  cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &&
+  pwd -P
+)"
+CURRENT_GIT_ROOT_DIR=""
+SCRIPT_GIT_ROOT_DIR=""
+if command -v git >/dev/null 2>&1; then
+  CURRENT_GIT_ROOT_DIR="$(
+    git -C "$CURRENT_DIR" rev-parse --show-toplevel 2>/dev/null || true
+  )"
+  SCRIPT_GIT_ROOT_DIR="$(
+    git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || true
+  )"
+fi
+
 # print an error message
 echo_error() {
   echo "Error:" "$@" 1>&2
@@ -10,48 +28,73 @@ echo_error() {
 
 # if the listed commands aren't found, exit with an error message
 test_commands() {
-  local flags=$-
-  local exit=false
-  if [[ $flags =~ e ]]; then set +e; fi # disable exit on error
-  # for each argument
-  while [[ $# -gt 0 ]]; do
-    # check that command is defined
-    if [ ! -x "$(command -v "$1")" ]; then
-      echo_error "The required program \"$1\" is not installed"
-      exit=true
+  local missing=false
+  for command_name in "$@"; do
+    if ! command -v "$command_name" >/dev/null 2>&1; then
+      echo_error "The required program \"$command_name\" is not installed"
+      missing=true
     fi
-    shift
   done
-  if [[ $flags =~ e ]]; then set -e; fi # re-enable exit on error
-  if $exit; then exit 1; fi
+  if [[ "$missing" == true ]]; then exit 1; fi
+}
+
+# get a file from relative path, checking from root dir of git project, then script dir, then current dir
+get_file() {
+  local file_path="$1"
+  local candidate
+  if [[ "$file_path" == /* ]]; then
+    candidate="$(realpath -e -- "$file_path" 2>/dev/null)" || return 1
+    [[ -f "$candidate" && -r "$candidate" ]] || return 1
+    printf '%s\n' "$candidate"
+    return 0
+  fi
+  local dir
+  for dir in "$SCRIPT_GIT_ROOT_DIR" "$CURRENT_GIT_ROOT_DIR" "$SCRIPT_DIR" "$CURRENT_DIR"; do
+    [[ -n "$dir" ]] || continue
+    if candidate="$(realpath -e -- "$dir/$file_path" 2>/dev/null)"; then
+      [[ -f "$candidate" && -r "$candidate" ]] || continue
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+test_commands realpath
+
+# load env variables from the secrets file
+load_env_variables() {
+  local load_env_script
+  if ! load_env_script="$(get_file "scripts/load-env.sh")"; then
+    echo_error "Could not locate scripts/load-env.sh"
+    return 1
+  fi
+  local secrets_env_file
+  for secrets_env_file in "$@"; do
+    # shellcheck disable=SC1091 source=/dev/null
+    ENV_FILE="$secrets_env_file" source "$load_env_script"
+  done
 }
 
 # if the listed env variables aren't found, exit with an error message
 test_env_variables() {
-  local flags=$-
-  local exit=false
-  if [[ $flags =~ u ]]; then set +u; fi # disable exit on undefined variables
-  # for each argument
-  while [[ $# -gt 0 ]]; do
-    # check that env variable is defined
-    if [ -z "${!1}" ]; then
-      echo_error "The required environment variable \"$1\" is not defined"
-      exit=true
+  local missing=false
+  local var_name
+  for var_name in "$@"; do
+    if [[ -z "${!var_name:-}" ]]; then
+      echo_error "The required environment variable \"$var_name\" is not defined"
+      missing=true
     fi
-    shift
   done
-  if [[ $flags =~ u ]]; then set -u; fi # re-enable exit on undefined variables
-  if $exit; then exit 1; fi
+  if [[ "$missing" == true ]]; then exit 1; fi
 }
+
+### SCRIPT ###
 
 # entrypoint of the script
 main() {
-  # load values from the secrets file
-  : "${SECRETS_ENV_FILE:='.env'}"
-  if [ -r './load-env.sh' ]; then
-    # shellcheck disable=SC1091 source=/dev/null
-    ENV_FILE="$SECRETS_ENV_FILE" source ./load-env.sh
-  fi
+  : "${SECRETS_ENV_FILE:=.env}"
+  load_env_variables "$SECRETS_ENV_FILE"
+  echo "TODO: dev.sh"
 }
 
 main "$@"
