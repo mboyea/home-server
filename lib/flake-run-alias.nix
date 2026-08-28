@@ -1,7 +1,7 @@
 { pkgs, pname, version, packages }:
 let
   run-alias = pkgs.writeShellScriptBin "run" ''
-    TARGET_SCRIPT=''${1:-help}
+    TARGET_SCRIPT="''$1"
     ROOT_DIR=$(${pkgs.git}/bin/git rev-parse --show-toplevel 2>/dev/null)
     ROOT_DIR=''${ROOT_DIR:-$(pwd)}
     SCRIPT_PATH="$ROOT_DIR/scripts/$TARGET_SCRIPT.sh"
