@@ -12,9 +12,11 @@
     && (libSrc ? extend)
   then libSrc.extend pkgs
   else pkgs;
+  allDirs = pkgs.lib.filterAttrs (n: v: v == "directory") (builtins.readDir ./.);
+  validDirs = pkgs.lib.filterAttrs (n: v: builtins.pathExists (./. + "/${n}/default.nix")) allDirs;
 in _pkgs.lib.mapAttrs'
   (n: v: let
-    name = _pkgs.lib.toCamelCase n;
+    name = pkgs.lib.toCamelCase n;
     value = import (./. + "/${n}") { pkgs = _pkgs; };
   in _pkgs.lib.nameValuePair name value)
-  (_pkgs.lib.filterAttrs (n: v: v == "directory") (builtins.readDir ./.))
+  validDirs
