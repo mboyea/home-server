@@ -3,6 +3,28 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+### DOCUMENTATION ###
+
+# CHANGELOG
+# 1.0.0 published on 2026-09-XX by Matthew Boyea
+# - User can run one or more targets with zero or more options
+# - The special help target is only viable as the first target; otherwise it will be interpreted as an option
+# - The special all target will pass its options to every other possible target (excluding the help target)
+# - Options passed with the all target are inherited softly; they're placed first in the arg list regardless of position of the all target:
+#   > run dev vw --debug all --slim
+#   will pass '--slim' to all targets; vw will execute with '--slim --debug'; if these args conflict, '--debug' should take precedence
+
+show_help() {
+  cat <<'EOF'
+  Usage:
+    run dev <target> [options...]
+  Targets:
+    all
+    help|--help|-h
+    vaultwarden|vw
+EOF
+}
+
 ### UTILS ###
 
 CURRENT_DIR="$PWD"
@@ -59,7 +81,6 @@ get_file() {
   done
   return 1
 }
-test_commands realpath
 
 # load env variables from the secrets file
 load_env_variables() {
@@ -90,11 +111,150 @@ test_env_variables() {
 
 ### SCRIPT ###
 
+# run dev all --slim vw --debug
+
+# [0]='all'
+# [1]='vaultwarden.sh'
+declare -a STAGED_TARGETS=()
+
+# [all]='TARGET_ARGS_ALL'
+# [vaultwarden.sh]='TARGET_ARGS_VAULTWARDEN'
+declare -A STAGED_TARGET_ARG_ARRAY_NAMES=()
+
+# TARGET_ARGS_ALL=('--slim')
+# TARGET_ARGS_VAULTWARDEN=('--debug')
+
+# get the name of arg array for a target
+get_target_arg_array_name() {
+  local target_key="${1%.sh}"
+  target_key="${target_key^^}"
+  target_key="${target_key//[^A-Z0-9_]/_}"
+  printf '%s\n' "TARGET_ARGS_$target_key"
+}
+
+# stage target and its args to the dispatch list
+stage_target() {
+  local target_script="$1"
+  shift
+  local arg_array_name="${STAGED_TARGET_ARG_ARRAY_NAMES[$target_script]:-}"
+  if [[ -z "$arg_array_name" ]]; then
+    arg_array_name="$(get_target_arg_array_name "$target_script")"
+    STAGED_TARGET_ARG_ARRAY_NAMES["$target_script"]="$arg_array_name"
+    STAGED_TARGETS+=("$target_script")
+    declare -g -a "$arg_array_name=()"
+  fi
+  local -n target_args="$arg_array_name"
+  target_args+=("$@")
+}
+
+# process all staged targets
+process_staged_targets() {
+  # TODO
+  echo "TODO: dev.sh"
+  local target_script
+  local arg_array_name
+
+  for target_script in "${STAGED_TARGETS[@]}"; do
+    arg_array_name="${STAGED_TARGET_ARG_ARRAY_NAMES[$target_script]}"
+
+    local -n target_args_ref="$arg_array_name"
+
+    printf 'Target: %s\n' "$TARGET_BASE_PATH/$target_script"
+    printf 'Args:'
+
+    if [[ "${#target_args_ref[@]}" -eq 0 ]]; then
+      printf ' <none>'
+    else
+      printf ' %q' "${target_args_ref[@]}"
+    fi
+
+    printf '\n'
+  done
+}
+
+# interpret args, distribute args across targets
+interpret_args() {
+  # default to all --debug
+  if [[ "$#" -eq 0 ]]; then
+    set -- 'all' '--debug'
+  fi
+
+  # interpret args
+  local target_script=''
+  local target_args=()
+  local potential_target_script=''
+  while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+      all)
+        if [[ -n "$target_script" ]]; then
+          stage_target "$target_script" "${target_args[@]}"
+        fi
+        target_script='all'
+        target_args=()
+        shift
+        continue
+        ;;
+      help|--help|-h)
+        if [[ -z "$target_script" ]]; then
+          show_help
+          return
+        fi
+        ;;&
+      *)
+        potential_target_script="${TARGETS_BY_ALIAS[$1]:-}"
+        if [[ -n "$potential_target_script" ]]; then
+          if [[ -n "$target_script" ]]; then
+            stage_target "$target_script" "${target_args[@]}"
+          fi
+          target_script="$potential_target_script"
+          target_args=()
+          shift
+          continue
+        fi
+        if [[ -n "$target_script" ]]; then
+          target_args+=("$1")
+          shift
+          continue
+        fi
+        echo_error "The argument \"$1\" is not a recognized target"
+        exit 1
+        ;;
+    esac
+  done
+  if [[ -n "$target_script" ]]; then
+    stage_target "$target_script" "${target_args[@]}"
+  fi
+}
+
 # entrypoint of the script
 main() {
   : "${SECRETS_ENV_FILE:=.env}"
   load_env_variables "$SECRETS_ENV_FILE"
-  echo "TODO: dev.sh"
+  interpret_args "$@"
+  process_staged_targets
 }
+
+### CONFIG ###
+
+TARGET_BASE_PATH='scripts/dev'
+
+declare -A TARGETS_BY_ALIAS=(
+  [vaultwarden]='vaultwarden.sh'
+  [vw]='vaultwarden.sh'
+)
+
+declare -a ALL_TARGETS=()
+
+### EXECUTION ###
+
+declare -A seen_targets=()
+for target in "${TARGETS_BY_ALIAS[@]}"; do
+  if [[ -z ${seen_targets[$target]+X} ]]; then
+    ALL_TARGETS+=("$target")
+    seen_targets[$target]=1
+  fi
+done
+
+test_commands realpath
 
 main "$@"
