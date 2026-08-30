@@ -41,7 +41,9 @@
       devShells = {
         default = pkgs.mkShell {
           inputsFrom = pkgs.lib.mapAttrsToList (n: v: v.devShells.default) modules;
-          packages = pkgs.lib.flakeRunAlias { inherit pname version packages; } ++ [];
+          packages = pkgs.lib.flakeRunAlias { inherit pname version packages; } ++ [
+            pkgs.tmux
+          ];
           shellHook = ''
             # load .env
             ENV_FILE=".env" source ./scripts/load-env.sh

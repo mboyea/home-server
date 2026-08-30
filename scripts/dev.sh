@@ -286,6 +286,6 @@ for target in "${TARGETS_BY_ALIAS[@]}"; do
   fi
 done
 
-test_commands realpath
+test_commands realpath tmux
 
 main "$@"
