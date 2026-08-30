@@ -13,7 +13,7 @@ Outputs a NixOS Linux ISO for use in a VM to keep servers sandboxed.
 
 Contents include:
 
-- Passward manager with Vault Warden
+- Password manager with Vault Warden
 - Photo manager with Immich
 - Document manager with Seafile
 
