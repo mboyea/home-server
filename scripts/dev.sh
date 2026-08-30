@@ -132,7 +132,7 @@ get_target_arg_array_name() {
   printf '%s\n' "TARGET_ARGS_$target_key"
 }
 
-# stage target and its args to the dispatch list
+# stage target and its args to the list
 stage_target() {
   local target_script="$1"
   shift
@@ -147,25 +147,57 @@ stage_target() {
   target_args+=("$@")
 }
 
-# process all staged targets
+# first expand staged args from all to the other targets; then execute scripts
 process_staged_targets() {
-  # TODO
-  echo "TODO: dev.sh"
+  # expand staged args from all, if any
+  local all_target_arg_array_name="${STAGED_TARGET_ARG_ARRAY_NAMES[all]:-}"
+  if [[ -n "$all_target_arg_array_name" ]]; then
+    local -n all_args_ref="$all_target_arg_array_name"
+    local target_script
+    local target_arg_array_name
+    # for each potential target
+    for target_script in "${ALL_TARGETS[@]}"; do
+      target_arg_array_name="${STAGED_TARGET_ARG_ARRAY_NAMES[$target_script]:-}"
+      # stage target if it was not already staged
+      if [[ -z "$target_arg_array_name" ]]; then
+        stage_target "$target_script"
+        target_arg_array_name="${STAGED_TARGET_ARG_ARRAY_NAMES[$target_script]}"
+      fi
+      # prepend args from all to the target
+      local -n target_args_ref="$target_arg_array_name"
+      target_args_ref=(
+        "${all_args_ref[@]}"
+        "${target_args_ref[@]}"
+      )
+      unset -n target_args_ref
+    done
+    # remove all from the execution list
+    local target_index 
+    for target_index in "${!STAGED_TARGETS[@]}"; do
+      if [[ "${STAGED_TARGETS[$target_index]}" == 'all' ]]; then
+        unset "STAGED_TARGETS[$target_index]"
+      fi
+    done
+    STAGED_TARGETS=("${STAGED_TARGETS[@]}")
+    unset 'STAGED_TARGET_ARG_ARRAY_NAMES[all]'
+  fi
+  # execute each staged target
+  # TODO HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH
   local target_script
   local arg_array_name
 
   for target_script in "${STAGED_TARGETS[@]}"; do
     arg_array_name="${STAGED_TARGET_ARG_ARRAY_NAMES[$target_script]}"
 
-    local -n target_args_ref="$arg_array_name"
+    local -n atarget_args_ref="$arg_array_name"
 
     printf 'Target: %s\n' "$TARGET_BASE_PATH/$target_script"
     printf 'Args:'
 
-    if [[ "${#target_args_ref[@]}" -eq 0 ]]; then
+    if [[ "${#atarget_args_ref[@]}" -eq 0 ]]; then
       printf ' <none>'
     else
-      printf ' %q' "${target_args_ref[@]}"
+      printf ' %q' "${atarget_args_ref[@]}"
     fi
 
     printf '\n'
@@ -243,10 +275,9 @@ declare -A TARGETS_BY_ALIAS=(
   [vw]='vaultwarden.sh'
 )
 
-declare -a ALL_TARGETS=()
-
 ### EXECUTION ###
 
+declare -a ALL_TARGETS=()
 declare -A seen_targets=()
 for target in "${TARGETS_BY_ALIAS[@]}"; do
   if [[ -z ${seen_targets[$target]+X} ]]; then
