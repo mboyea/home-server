@@ -64,21 +64,25 @@ test_commands() {
 get_file() {
   local file_path="$1"
   local candidate
+  # handle absolute paths
   if [[ "$file_path" == /* ]]; then
     candidate="$(realpath -e -- "$file_path" 2>/dev/null)" || return 1
     [[ -f "$candidate" && -r "$candidate" ]] || return 1
     printf '%s\n' "$candidate"
     return 0
   fi
+  # search for the file in the preferred directory order
   local dir
   for dir in "$SCRIPT_GIT_ROOT_DIR" "$CURRENT_GIT_ROOT_DIR" "$SCRIPT_DIR" "$CURRENT_DIR"; do
     [[ -n "$dir" ]] || continue
+    # resolve and utilize the first matching readable file
     if candidate="$(realpath -e -- "$dir/$file_path" 2>/dev/null)"; then
       [[ -f "$candidate" && -r "$candidate" ]] || continue
       printf '%s\n' "$candidate"
       return 0
     fi
   done
+  # fail in the case that no valid file was found
   return 1
 }
 
