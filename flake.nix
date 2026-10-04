@@ -27,7 +27,13 @@
         dev = pkgs.lib.run {
           name = "${pname}-dev-${version}";
           target = ./scripts/dev.sh;
-          # TODO: pass env which is exe of modules->mk-container to call
+          runtimeInputs = [
+            pkgs.tmux
+          ];
+          runtimeEnv = {
+            PNAME = pname;
+            # TODO: pass exe of various mk-container { modules }
+          };
         };
         help = pkgs.lib.run {
            name = "${pname}-help-${version}";
