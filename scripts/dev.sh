@@ -6,6 +6,29 @@ set -o pipefail
 ### DOCUMENTATION ###
 
 # CHANGELOG
+# 1.1.0 published on 2026-10-__ by Matthew Boyea
+# - This script now handles a set of panes for each target
+#   - control pane
+#   - logs pane
+#   - shell pane
+# - Panes could report a state 'missing', 'running', 'finished', 'error'
+# - If a pane already has a 'running' process then it will not be replaced
+# - This script now expects .sh scripts supplied to it to provide a common api contract
+#   - help           -> control pane
+#   - up|start       -> control pane
+#   - down|stop      -> control pane
+#   - reboot|restart -> control pane
+#   - exec           -> control pane
+#   - status         -> control pane
+#   - health         -> control pane
+#   - logs           -> logs pane
+#   - shell          -> shell pane
+# - This script will perform the following sequence:
+#   - Create or find the target session window
+#   - Create the required panes for the target if not 'running'
+#   - Run the expected commands in the required panes
+#   - Report the result of the command
+# - When 'up' is run, 'logs' and 'shell' are also run
 # 1.0.0 published on 2026-10-03 by Matthew Boyea
 # - User can run one or more targets with zero or more options
 # - The special help target is only viable as the first target; otherwise it will be interpreted as an option
@@ -14,7 +37,7 @@ set -o pipefail
 #   > run dev vw --debug all --slim
 #   will pass '--slim' to all targets; vw will execute with '--slim --debug'; if these args conflict, '--debug' should take precedence
 # - Targets which aren't deemed 'special' are run in a tmux window
-# - If a session is already running, this script will skip it
+# - If a target is already running, this script will skip it
 
 show_help() {
   cat <<'EOF'
@@ -196,7 +219,7 @@ echo_tmux_session_status() {
     )"
     # handle missing tmux window
     if ! get_does_tmux_window_exist "$tmux_session_name" "$target_window_name"; then
-      printf '%-20s %s\n' "$target_window_name" 'not present'
+      printf '%-20s %s\n' "$target_window_name" 'missing'
       continue
     fi
     # get tmux window info
